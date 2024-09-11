@@ -1,0 +1,165 @@
+package com.aurionpro.mappings.controller;
+
+import com.aurionpro.mappings.dto.BankAccountDto;
+import com.aurionpro.mappings.dto.BankAccountRequestDto;
+import com.aurionpro.mappings.dto.PageResponse;
+import com.aurionpro.mappings.entity.BankAccount;
+import com.aurionpro.mappings.entity.Customer;
+import com.aurionpro.mappings.exception.BankAccountNotFoundException;
+import com.aurionpro.mappings.exception.CustomerNotFoundException;
+import com.aurionpro.mappings.exception.InvalidInputException;
+import com.aurionpro.mappings.service.BankAccountService;
+import com.aurionpro.mappings.service.CustomerService;
+
+import jakarta.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/bankapp")
+public class BankAccountController {
+
+    @Autowired
+    private BankAccountService bankAccountService;
+    
+    @Autowired
+    private CustomerService customerService;
+
+    // Endpoint to create a new bank account
+    @PostMapping("/createBankAccount")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<BankAccountDto> createBankAccount(
+            @Valid @RequestBody BankAccountRequestDto bankAccountRequestDto){
+           
+
+        try {
+            // Extract customerId either from bankAccountRequestDto directly or from the nested customerDto
+            Integer customerId = bankAccountRequestDto.getCustomerId();
+
+            if (customerId == null && bankAccountRequestDto.getCustomerDto() != null) {
+                customerId = bankAccountRequestDto.getCustomerDto().getCustomerId();
+            }
+
+            if (customerId == null) {
+                throw new InvalidInputException("Customer ID must not be null");
+            }
+
+            // Find the customer using CustomerService
+            Customer customer = customerService.findByCustomerId(customerId);
+
+            // Create and return the bank account
+            BankAccountDto bankAccountDto = bankAccountService.createBankAccount(
+                    customer,
+                    bankAccountRequestDto.getAccountType(),
+                    bankAccountRequestDto.getBalance()
+            );
+
+            return new ResponseEntity<>(bankAccountDto, HttpStatus.CREATED);
+        } catch (CustomerNotFoundException e) {
+            throw e; // This will be handled by ExceptionHandlerBank
+        } catch (InvalidInputException e) {
+            throw e; // This will be handled by ExceptionHandlerBank
+        }
+    }
+
+
+    
+    
+    @GetMapping("/customerId")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Integer>> getCustomerIdByAccountNumber(@Valid @RequestBody String accountNumber) {
+        try {
+            int customerId = bankAccountService.getCustomerIdByAccountNumber(accountNumber);
+            Map<String, Integer> response = new HashMap<>();
+            response.put("customerId", customerId);
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch (RuntimeException e) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+    
+    
+    @GetMapping("/bankaccount")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PageResponse<BankAccount>> getAllBankAccounts(@Valid
+    	    @RequestParam int pageNo,
+    	    @RequestParam int pageSize) {
+    	    PageResponse<BankAccount> pageResponse = bankAccountService.getAllBankAccounts(pageNo, pageSize);
+    	    return new ResponseEntity<>(pageResponse, HttpStatus.OK);
+    	}
+
+    // Endpoint to retrieve a bank account by ID
+
+    @GetMapping("/bankaccount")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<BankAccount> getBankAccountById(@Valid @RequestBody int bankId) {
+        try {
+            BankAccount bankAccount = bankAccountService.getBankAccountById(bankId);
+            return new ResponseEntity<>(bankAccount, HttpStatus.OK);
+        } catch (BankAccountNotFoundException e) {
+            throw e; // This will be handled by ExceptionHandlerBank
+        }
+    }
+
+    
+    
+    @GetMapping("/accountnumber/{accountNumber}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<BankAccount> getBankAccountByNumber(@Valid @RequestBody String accountNumber) {
+        try {
+            BankAccount bankAccount = bankAccountService.getBankAccountByNumber(accountNumber);
+            return new ResponseEntity<>(bankAccount, HttpStatus.OK);
+        } catch (BankAccountNotFoundException e) {
+            throw e; // This will be handled by ExceptionHandlerBank
+        } catch (InvalidInputException e) {
+            throw e; // This will be handled by ExceptionHandlerBank
+        }
+    }
+
+
+    
+    @GetMapping("/customer/{customerId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<BankAccount>> getBankAccountsByCustomerId(@Valid @RequestBody int customerId) {
+        List<BankAccount> accounts = bankAccountService.getBankAccountsByCustomerId(customerId);
+        return ResponseEntity.ok(accounts);
+    }
+
+
+
+    // Endpoint to update an existing bank account
+//    @PutMapping("bankaccount/{bankId}")
+//    public ResponseEntity<BankAccount> updateBankAccount(@RequestParam int bankId, @RequestBody BankAccount bankAccount) {
+//        try {
+//            BankAccount updatedBankAccount = bankAccountService.updateBankAccount(bankId, bankAccount);
+//            return new ResponseEntity<>(updatedBankAccount, HttpStatus.OK);
+//        } catch (BankAccountNotFoundException e) {
+//            throw e; // This will be handled by ExceptionHandlerBank
+//        } catch (InvalidInputException e) {
+//            throw e; // This will be handled by ExceptionHandlerBank
+//        }
+//    }
+
+
+//    // Endpoint to delete a bank account
+//    @DeleteMapping("bankaccount/{bankId}")
+//    public ResponseEntity<Void> deleteBankAccount(@RequestParam int bankId) {
+//        try {
+//            bankAccountService.deleteBankAccount(bankId);
+//            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+//        } catch (BankAccountNotFoundException e) {
+//            throw e; // This will be handled by ExceptionHandlerBank
+//        }
+//    }
+
+    // Endpoint to retrieve all bank accounts
+   
+}

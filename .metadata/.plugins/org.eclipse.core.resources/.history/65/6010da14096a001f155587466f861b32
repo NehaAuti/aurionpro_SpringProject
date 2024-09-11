@@ -1,0 +1,5 @@
+package com.aurionpro.mappings.controller;
+
+public class AuthController {
+
+}

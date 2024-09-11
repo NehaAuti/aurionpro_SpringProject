@@ -1,0 +1,83 @@
+package com.aurionpro.mappings.service;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.stereotype.Service;
+import jakarta.activation.DataSource;
+
+
+import jakarta.activation.DataSource;
+import jakarta.activation.FileDataSource;
+import jakarta.mail.Address;
+import jakarta.mail.Message;
+import jakarta.mail.MessagingException;
+import jakarta.mail.Multipart;
+import jakarta.mail.Part;
+import jakarta.mail.Session;
+import jakarta.mail.Transport;
+import jakarta.mail.internet.InternetAddress;
+import jakarta.mail.internet.MimeBodyPart;
+import jakarta.mail.internet.MimeMessage;
+import jakarta.mail.internet.MimeMultipart;
+
+import java.util.Properties;
+
+@Service
+public class EmailService {
+
+    @Value("${spring.mail.username}")
+    private String fromEmail;
+
+    @Autowired
+    private JavaMailSender mailSender;
+
+    public void sendEmail(String to, String subject, String body) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(to);
+        message.setSubject(subject);
+        message.setText(body);
+        message.setFrom(fromEmail);
+        mailSender.send(message);
+    }
+
+    public void sendEmailWithAttachment(String to, String subject, String body, String filePath) throws MessagingException {
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true);
+        
+        helper.setTo(to);
+        helper.setSubject(subject);
+        helper.setText(body);
+        helper.setFrom(fromEmail);
+        
+        if (filePath != null && !filePath.isEmpty()) {
+            FileSystemResource file = new FileSystemResource(filePath);
+            helper.addAttachment(file.getFilename(), file);
+        }
+        
+        mailSender.send(message);
+    }
+}
+//import org.springframework.beans.factory.annotation.Autowired;
+//import org.springframework.mail.SimpleMailMessage;
+//import org.springframework.mail.javamail.JavaMailSender;
+//import org.springframework.stereotype.Service;
+//
+//@Service
+//public class EmailService {
+//
+//    @Autowired
+//    private JavaMailSender mailSender;
+//
+//    public void sendEmail(String to, String subject, String body) {
+//        SimpleMailMessage message = new SimpleMailMessage();
+//        message.setTo(to);
+//        message.setSubject(subject);
+//        message.setText(body);
+//        message.setFrom("nehaauti05@gmail.com");
+//
+//        mailSender.send(message);
+//    }

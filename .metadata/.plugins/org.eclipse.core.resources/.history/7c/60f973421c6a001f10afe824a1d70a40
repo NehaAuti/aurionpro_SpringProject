@@ -1,0 +1,115 @@
+package com.aurionpro.mappings.service;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+
+import com.aurionpro.mappings.dto.CustomerDto;
+import com.aurionpro.mappings.dto.LoginDTO;
+import com.aurionpro.mappings.dto.RegistrationDTO;
+import com.aurionpro.mappings.entity.Customer;
+import com.aurionpro.mappings.entity.Role;
+import com.aurionpro.mappings.entity.User;
+import com.aurionpro.mappings.exception.UserApiException;
+import com.aurionpro.mappings.repository.RoleRepository;
+import com.aurionpro.mappings.repository.UserRepository;
+import com.aurionpro.mappings.security.JwtTokenProvider;
+import com.aurionpro.mappings.repository.CustomerRepository;
+
+import lombok.AllArgsConstructor;
+
+@Service
+@AllArgsConstructor
+public class AuthServiceImpl implements AuthService {
+
+	@Autowired
+    private final AuthenticationManager authenticationManager;
+	@Autowired
+    private final UserRepository userRepo;
+	@Autowired
+    private final RoleRepository roleRepo;
+	@Autowired
+    private final PasswordEncoder passwordEncoder;
+	@Autowired
+    private final JwtTokenProvider tokenProvider;
+	@Autowired
+    private final CustomerRepository customerRepo;
+	@Autowired
+	private final UserDetailsService userDetailsService;
+
+    @Override
+    public User register(RegistrationDTO registration) {
+        if (userRepo.existsByUsername(registration.getUsername())) {
+            throw new UserApiException(HttpStatus.BAD_REQUEST, "User already exists");
+        }
+
+        User user = new User();
+        user.setUsername(registration.getUsername());
+        user.setPassword(passwordEncoder.encode(registration.getPassword()));
+
+        List<Role> roles = new ArrayList<>();
+        Role userRole = roleRepo.findByRolename(registration.getRole())
+                .orElseThrow(() -> new UserApiException(HttpStatus.NOT_FOUND, "Role not found"));
+        roles.add(userRole);
+        user.setRoles(roles);
+
+        return userRepo.save(user);
+    }
+    
+    @Override
+    public Customer register(CustomerDto registration) {
+        if (customerRepo.existsByEmailId(registration.getEmailId())) {
+            throw new UserApiException(HttpStatus.BAD_REQUEST, "Customer already exists");
+        }
+
+        Customer customer = new Customer();
+        customer.setFirstName(registration.getFirstName());
+        customer.setLastName(registration.getLastName());
+        customer.setEmailId(registration.getEmailId());
+        customer.setPassword(passwordEncoder.encode(registration.getPassword()));
+        customer.setBalance(registration.getBalance());
+
+        Role customerRole = roleRepo.findByRolename("ROLE_CUSTOMER")
+                .orElseThrow(() -> new UserApiException(HttpStatus.NOT_FOUND, "Role not found"));
+        customer.setRoles(Collections.singletonList(customerRole));
+
+        return customerRepo.save(customer);
+    }
+    
+    
+    
+    @Override
+    public String login(LoginDTO loginDto) {
+        try {
+            // Load user by username (which could be either the email for Customer or username for Admin)
+            UserDetails userDetails = userDetailsService.loadUserByUsername(loginDto.getUsername());
+
+            // Authenticate the user
+            Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                    userDetails.getUsername(),
+                    loginDto.getPassword(),
+                    userDetails.getAuthorities())
+            );
+
+            // Set authentication in the security context
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            // Generate and return JWT token
+            return tokenProvider.generateToken(authentication);
+        } catch (BadCredentialsException e) {
+            throw new UserApiException(HttpStatus.UNAUTHORIZED, "Invalid username or password");
+        }
+    }

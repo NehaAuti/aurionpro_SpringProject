@@ -1,0 +1,14 @@
+package com.aurionpro.mappings.repository;
+
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import org.springframework.stereotype.Repository;
+
+import com.aurionpro.mappings.entity.Captcha;
+
+@Repository
+public interface CaptchaRepository extends JpaRepository<Captcha, Long> {
+	 Optional<Captcha> findById(String captchaId);
+}

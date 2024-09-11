@@ -1,0 +1,48 @@
+package com.aurionpro.mappings.service;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.json.JSONObject;
+@Service
+public class RecaptchaService {
+
+    @Value("${recaptcha.secret}")
+    private String recaptchaSecret;
+
+    @Value("${recaptcha.site.key}")
+    private String recaptchaSiteKey;
+
+    // This method will validate the reCAPTCHA token received from the client
+    public boolean validateRecaptcha(String captchaResponse) {
+        String url = "https://www.google.com/recaptcha/api/siteverify";
+        RestTemplate restTemplate = new RestTemplate();
+
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("secret", recaptchaSecret);
+        body.add("response", captchaResponse);
+
+        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body);
+        ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+
+        // Parse the response from reCAPTCHA
+        boolean success = false;
+        if (response.getStatusCode() == HttpStatus.OK) {
+            JSONObject jsonResponse = new JSONObject(response.getBody());
+            success = jsonResponse.getBoolean("success");
+        }
+
+        return success;
+    }
+
+    // This method would provide the site key for reCAPTCHA to the frontend
+    public String getRecaptchaSiteKey() {
+        return recaptchaSiteKey;
+    }
+}

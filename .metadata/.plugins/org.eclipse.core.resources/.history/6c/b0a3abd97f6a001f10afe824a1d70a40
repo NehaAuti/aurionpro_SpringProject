@@ -1,0 +1,114 @@
+package com.aurionpro.mappings.controller;
+
+
+import org.springframework.beans.factory.annotation.Autowired;
+
+
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import com.aurionpro.mappings.dto.CustomerDto;
+import com.aurionpro.mappings.dto.JwtAuthResponse;
+import com.aurionpro.mappings.dto.LoginDTO;
+import com.aurionpro.mappings.dto.RegistrationDTO;
+import com.aurionpro.mappings.entity.Admin;
+import com.aurionpro.mappings.entity.Customer;
+import com.aurionpro.mappings.entity.User;
+import com.aurionpro.mappings.exception.CustomerNotFoundException;
+import com.aurionpro.mappings.exception.InvalidInputException;
+import com.aurionpro.mappings.exception.UserApiException;
+import com.aurionpro.mappings.service.AuthService;
+import com.aurionpro.mappings.service.LoginService;
+
+import jakarta.validation.Valid;
+
+@RestController
+@RequestMapping("/bankapp")
+public class LoginController {
+	
+	@Autowired
+    private LoginService loginService;
+	
+	
+	
+	@Autowired
+    private AuthService authService;
+
+//    @PostMapping("register/admin")
+//    public ResponseEntity<User> register(@Valid @RequestBody RegistrationDTO registerDto) {
+//        return ResponseEntity.ok(authService.register(registerDto));
+//    }
+//
+//    @PostMapping("/login")
+//    public ResponseEntity<JwtAuthResponse> login(@RequestBody LoginDTO loginDto) {
+//        JwtAuthResponse jwtResponse = authService.login(loginDto);
+//        return new ResponseEntity<>(jwtResponse, HttpStatus.OK);
+//    }
+
+//    @PostMapping("/login/customer")
+//    public ResponseEntity<String> loginCustomer(
+//            @RequestParam String emailId,
+//            @RequestParam String password) {
+//        try {
+//            String status = loginService.loginCustomer(emailId, password);
+//            return ResponseEntity.ok(status);
+//        } catch (CustomerNotFoundException e) {
+//            return new ResponseEntity<>(e.getMessage(), HttpStatus.NOT_FOUND);
+//        } catch (InvalidInputException e) {
+//            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+//        } catch (Exception e) {
+//            return new ResponseEntity<>("An unexpected error occurred", HttpStatus.INTERNAL_SERVER_ERROR);
+//        }
+//    }
+//
+//
+//    @PostMapping("/login/admin")
+//    public ResponseEntity<String> loginAdmin(
+//            @RequestParam String username,
+//            @RequestParam String password) {
+//        try {
+//            String status = loginService.loginAdmin(username, password);
+//            return ResponseEntity.ok(status);
+//        } catch (CustomerNotFoundException e) {
+//            return new ResponseEntity<>(e.getMessage(), HttpStatus.NOT_FOUND);
+//        } catch (InvalidInputException e) {
+//            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+//        } catch (Exception e) {
+//            return new ResponseEntity<>("An unexpected error occurred", HttpStatus.INTERNAL_SERVER_ERROR);
+//        }
+//    }
+//    
+//    @PostMapping("/login")
+//    public ResponseEntity<String> loginWithRole(
+//            @RequestParam String role,
+//            @RequestParam String usernameOrEmail,
+//            @RequestParam String password) {
+//        try {
+//            String status = loginService.loginWithRole(role, usernameOrEmail, password);
+//            return ResponseEntity.ok(status);
+//        } catch (CustomerNotFoundException e) {
+//            return new ResponseEntity<>(e.getMessage(), HttpStatus.NOT_FOUND);
+//        } catch (InvalidInputException e) {
+//            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+//        } catch (Exception e) {
+//            return new ResponseEntity<>("An unexpected error occurred", HttpStatus.INTERNAL_SERVER_ERROR);
+//        }
+//    }
+//
+//    @PostMapping("/addAdmin")
+//    public ResponseEntity<String> addAdmin(@RequestBody Admin admin) {
+//        try {
+//            String status = loginService.addAdmin(admin);
+//            return ResponseEntity.ok(status);
+//        } catch (InvalidInputException e) {
+//            return new ResponseEntity<>(e.getMessage(), HttpStatus.BAD_REQUEST);
+//        } catch (Exception e) {
+//            return new ResponseEntity<>("An unexpected error occurred", HttpStatus.INTERNAL_SERVER_ERROR);
+//        }
+//    }
+    
+ 
+}

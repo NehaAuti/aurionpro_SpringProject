@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring accessors="true" comment="Delete element from project &apos;23-clouderadocument-app&apos;&#x0D;&#x0A;- Original project: &apos;23-clouderadocument-app&apos;&#x0D;&#x0A;- Original element: &apos;23-clouderadocument-app/src/main/java/com.aurionpro.cloudera.controller&apos;" description="Delete element" element1="/src\/main\/java=/optional=/true=/=/maven.pomderived=/true=/&lt;com.aurionpro.cloudera.controller" element2="/src\/main\/java=/optional=/true=/=/maven.pomderived=/true=/&lt;com.aurionpro.cloudera" elements="2" flags="589830" id="org.eclipse.jdt.ui.delete" resources="0" stamp="1724775755893" subPackages="false" version="1.0"/>
+</session>

@@ -1,0 +1,15 @@
+package com.aurionpro.mappings.service;
+
+import java.util.List;
+
+import com.aurionpro.mappings.entity.Passbook;
+import com.aurionpro.mappings.entity.Transaction;
+
+import jakarta.mail.MessagingException;
+
+public interface PassbookService {
+	List<Passbook> getPassbooksBySenderAccountNumber(String senderAccountNumber);
+
+	void generateAndSendPassbook(String email, List<Transaction> transactions) throws MessagingException, javax.mail.MessagingException;
+
+}

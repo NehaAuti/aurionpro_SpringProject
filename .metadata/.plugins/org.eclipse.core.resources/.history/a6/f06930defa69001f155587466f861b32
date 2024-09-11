@@ -1,0 +1,11 @@
+package com.aurionpro.mappings.dto;
+
+public class TransactionRequestDto {
+	
+	    private int customerId;
+	    private String senderAccountNumber;
+	    private String receiverAccountNumber;
+	    private double amount;
+	    private String transactionType;
+
+}

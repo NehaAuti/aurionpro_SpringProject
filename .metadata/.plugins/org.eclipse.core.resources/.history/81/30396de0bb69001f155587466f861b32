@@ -1,0 +1,32 @@
+package com.aurionpro.mappings.dto;
+
+import jakarta.persistence.Column;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
+public class BankAccountDto {
+	    @NotBlank(message = "Account number is mandatory")
+	    @Pattern(regexp = "^[A-Za-z0-9]{10}$", message = "Account number must be 10 alphanumeric characters")
+	   
+	    private String accountNumber;
+	    
+	    @NotBlank(message = "Account type is mandatory")
+	    @Size(max = 50, message = "Account type cannot exceed 50 characters")
+	
+	    private String accountType;
+	    
+	    @NotNull(message = "Balance is mandatory")
+	    @Min(value = 5000, message = "Balance must be at least 5000")
+	    private Double balance;
+	    private CustomerDto customerDto;
+
+}

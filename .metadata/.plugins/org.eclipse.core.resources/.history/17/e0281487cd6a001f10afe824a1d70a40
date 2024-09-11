@@ -1,0 +1,5 @@
+package com.aurionpro.mappings.config;
+
+public class RecaptchaService {
+
+}

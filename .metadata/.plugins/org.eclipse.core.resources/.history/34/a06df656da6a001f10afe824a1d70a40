@@ -1,0 +1,50 @@
+package com.aurionpro.mappings.service;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.json.JSONObject;
+@Service
+public class RecaptchaService {
+
+    @Value("${recaptcha.secret}")
+    private String recaptchaSecret;
+
+    public boolean validateRecaptcha(String captchaResponse) {
+        // Bypass reCAPTCHA validation in development mode
+        if (isDevelopmentEnvironment()) {
+            return true;
+        }
+
+        String url = "https://www.google.com/recaptcha/api/siteverify";
+        RestTemplate restTemplate = new RestTemplate();
+
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("secret", recaptchaSecret);
+        body.add("response", captchaResponse);
+
+        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body);
+        ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+
+        // Parse the response from reCAPTCHA
+        // Assuming the response body is in JSON format
+        boolean success = false;
+        if (response.getStatusCode() == HttpStatus.OK) {
+            JSONObject jsonResponse = new JSONObject(response.getBody());
+            success = jsonResponse.getBoolean("success");
+        }
+
+        return success;
+    }
+
+    private boolean isDevelopmentEnvironment() {
+        // Implement your own logic to determine if you are in a development environment
+        return true; // or false based on your actual development environment check
+    }
+}

@@ -1,0 +1,137 @@
+package com.aurionpro.mappings.controller;
+
+import com.aurionpro.mappings.dto.BankAccountDto;
+import com.aurionpro.mappings.dto.PageResponse;
+import com.aurionpro.mappings.entity.BankAccount;
+import com.aurionpro.mappings.entity.Customer;
+import com.aurionpro.mappings.exception.BankAccountNotFoundException;
+import com.aurionpro.mappings.exception.CustomerNotFoundException;
+import com.aurionpro.mappings.exception.InvalidInputException;
+import com.aurionpro.mappings.service.BankAccountService;
+import com.aurionpro.mappings.service.CustomerService;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/bankapp")
+public class BankAccountController {
+
+    @Autowired
+    private BankAccountService bankAccountService;
+    
+    @Autowired
+    private CustomerService customerService;
+
+    // Endpoint to create a new bank account
+    @PostMapping("/bankaccount/create")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<BankAccountDto> createBankAccount(
+            @RequestParam("customerId") int customerId,
+            @RequestParam("accountType") String accountType,
+            @RequestParam("balance") Double balance) {
+        try {
+            // Find the customer using CustomerService
+            Customer customer = customerService.findByCustomerId(customerId);
+            // Create and return the bank account
+            BankAccountDto bankAccountDto = bankAccountService.createBankAccount(customer, accountType, balance);
+            return new ResponseEntity<>(bankAccountDto, HttpStatus.CREATED);
+        } catch (CustomerNotFoundException e) {
+            throw e; // This will be handled by ExceptionHandlerBank
+        } catch (InvalidInputException e) {
+            throw e; // This will be handled by ExceptionHandlerBank
+        }
+    }
+    
+    
+    @GetMapping("/customerId")
+    public ResponseEntity<Map<String, Integer>> getCustomerIdByAccountNumber(@RequestParam String accountNumber) {
+        try {
+            int customerId = bankAccountService.getCustomerIdByAccountNumber(accountNumber);
+            Map<String, Integer> response = new HashMap<>();
+            response.put("customerId", customerId);
+            return new ResponseEntity<>(response, HttpStatus.OK);
+        } catch (RuntimeException e) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+    
+    @GetMapping("/bankaccount")
+    public ResponseEntity<PageResponse<BankAccount>> getAllBankAccounts(
+    	    @RequestParam int pageNo,
+    	    @RequestParam int pageSize) {
+    	    PageResponse<BankAccount> pageResponse = bankAccountService.getAllBankAccounts(pageNo, pageSize);
+    	    return new ResponseEntity<>(pageResponse, HttpStatus.OK);
+    	}
+
+    // Endpoint to retrieve a bank account by ID
+
+    @GetMapping("/bankaccount/{bankId}")
+    public ResponseEntity<BankAccount> getBankAccountById(@PathVariable int bankId) {
+        try {
+            BankAccount bankAccount = bankAccountService.getBankAccountById(bankId);
+            return new ResponseEntity<>(bankAccount, HttpStatus.OK);
+        } catch (BankAccountNotFoundException e) {
+            throw e; // This will be handled by ExceptionHandlerBank
+        }
+    }
+
+    
+    
+    @GetMapping("/accountnumber/{accountNumber}")
+    public ResponseEntity<BankAccount> getBankAccountByNumber(@PathVariable String accountNumber) {
+        try {
+            BankAccount bankAccount = bankAccountService.getBankAccountByNumber(accountNumber);
+            return new ResponseEntity<>(bankAccount, HttpStatus.OK);
+        } catch (BankAccountNotFoundException e) {
+            throw e; // This will be handled by ExceptionHandlerBank
+        } catch (InvalidInputException e) {
+            throw e; // This will be handled by ExceptionHandlerBank
+        }
+    }
+
+
+    
+    @GetMapping("/customer/{customerId}")
+    public ResponseEntity<List<BankAccount>> getBankAccountsByCustomerId(@PathVariable int customerId) {
+        List<BankAccount> accounts = bankAccountService.getBankAccountsByCustomerId(customerId);
+        return ResponseEntity.ok(accounts);
+    }
+
+
+
+    // Endpoint to update an existing bank account
+//    @PutMapping("bankaccount/{bankId}")
+//    public ResponseEntity<BankAccount> updateBankAccount(@RequestParam int bankId, @RequestBody BankAccount bankAccount) {
+//        try {
+//            BankAccount updatedBankAccount = bankAccountService.updateBankAccount(bankId, bankAccount);
+//            return new ResponseEntity<>(updatedBankAccount, HttpStatus.OK);
+//        } catch (BankAccountNotFoundException e) {
+//            throw e; // This will be handled by ExceptionHandlerBank
+//        } catch (InvalidInputException e) {
+//            throw e; // This will be handled by ExceptionHandlerBank
+//        }
+//    }
+
+
+//    // Endpoint to delete a bank account
+//    @DeleteMapping("bankaccount/{bankId}")
+//    public ResponseEntity<Void> deleteBankAccount(@RequestParam int bankId) {
+//        try {
+//            bankAccountService.deleteBankAccount(bankId);
+//            return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+//        } catch (BankAccountNotFoundException e) {
+//            throw e; // This will be handled by ExceptionHandlerBank
+//        }
+//    }
+
+    // Endpoint to retrieve all bank accounts
+   
+}

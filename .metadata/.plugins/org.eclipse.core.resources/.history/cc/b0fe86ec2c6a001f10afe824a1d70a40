@@ -1,0 +1,156 @@
+package com.aurionpro.mappings.controller;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.aurionpro.mappings.dto.PageResponse;
+import com.aurionpro.mappings.dto.TransactionDTO;
+import com.aurionpro.mappings.entity.Transaction;
+import com.aurionpro.mappings.exception.InvalidInputException;
+import com.aurionpro.mappings.service.TransactionService;
+
+import jakarta.transaction.Transactional;
+import jakarta.validation.Valid;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/bankapp")
+public class TransactionController {
+
+    private static final Logger logger = LoggerFactory.getLogger(TransactionController.class);
+
+    @Autowired
+    private TransactionService transactionService;
+
+    @PostMapping("/newtransaction")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<String> createTransaction(@Valid @RequestBody TransactionDTO transactionRequest) {
+
+        // Validate transaction type
+        if (!isValidTransactionType(transactionRequest.getTransactionType())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid transaction type.");
+        }
+
+        // Validate amount
+        if (transactionRequest.getAmount() <= 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Amount must be positive.");
+        }
+
+        // Log transaction details
+        logTransactionDetails(
+                transactionRequest.getSenderAccountNumber(),
+                transactionRequest.getReceiverAccountNumber(),
+                transactionRequest.getAmount(),
+                transactionRequest.getTransactionType()
+        );
+
+        try {
+            // Create the transaction
+            Transaction transaction = transactionService.createTransaction(
+                    transactionRequest.getCustomerId(),
+                    transactionRequest.getSenderAccountNumber(),
+                    transactionRequest.getReceiverAccountNumber(),
+                    transactionRequest.getAmount(),
+                    transactionRequest.getTransactionType()
+            );
+
+            // Return success response with transaction details
+            return ResponseEntity.status(HttpStatus.OK).body("Transaction successful!! Transaction ID: " + transaction.getTransactionId());
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
+    }
+
+
+    
+    @GetMapping("/bankaccount/{accountNumber}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<Transaction>> getAllTransactionsByAccountNumber( @Valid @PathVariable String accountNumber) {
+        try {
+            List<Transaction> transactions = transactionService.getAllTransactionsByAccountNumber(accountNumber);
+            return new ResponseEntity<>(transactions, HttpStatus.OK);
+        } catch (RuntimeException e) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    }
+
+    private boolean isValidTransactionType(String transactionType) {
+        return "transfer".equalsIgnoreCase(transactionType) ||
+               "debit".equalsIgnoreCase(transactionType) ||
+               "credit".equalsIgnoreCase(transactionType);
+    }
+
+    private void logTransactionDetails(String senderAccountNumber, String receiverAccountNumber, double amount, String transactionType) {
+        // Use logger instead of System.out.println in production code
+        logger.info("Sender Account Number: {}", senderAccountNumber);
+        logger.info("Receiver Account Number: {}", receiverAccountNumber);
+        logger.info("Amount: {}", amount);
+        logger.info("Transaction Type: {}", transactionType);
+    }
+
+    @GetMapping("/transactions")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<PageResponse<Transaction>> viewTransactions(@Valid
+    	    @RequestParam int pageNo,
+    	    @RequestParam int pageSize) {
+    	    PageResponse<Transaction> pageResponse = transactionService.getAllTransactions(pageNo, pageSize);
+    	    return new ResponseEntity<>(pageResponse, HttpStatus.OK);
+    	}
+
+//    @GetMapping("/transactions/account/{accountNumber}")
+//    public ResponseEntity<List<Transaction>> getTransactionsByAccountNumber(@PathVariable String accountNumber) {
+//        try {
+//            logger.info("Request received to fetch transactions for account number: {}", accountNumber);
+//            List<Transaction> transactions = transactionService.getAllTransactionsByAccountNumber(accountNumber);
+//            return new ResponseEntity<>(transactions, HttpStatus.OK);
+//        } catch (Exception e) {
+//            logger.error("Error fetching transactions for account number: {}", accountNumber, e);
+//            throw new InvalidInputException("Unable to retrieve transactions for the given account number");
+//        }
+//    }
+
+}
+    
+    
+//    @PostMapping("/transaction/create")
+//    public ResponseEntity<Transaction> createTransaction(@RequestBody TransactionDTO transactionDTO) {
+//        try {
+//            // Call the service layer to handle the transaction
+//            Transaction transaction = transactionService.newTransaction(
+//                    transactionDTO.getTransactionType(),
+//                    transactionDTO.getSenderAccNo(),
+//                    transactionDTO.getReceiverAccNo(),
+//                    transactionDTO.getAmount()
+//            );
+//            // Return the created transaction with a 201 Created status
+//            return new ResponseEntity<>(transaction, HttpStatus.CREATED);
+//        } catch (IllegalArgumentException | BankAccountNotFoundException | InsufficientBalanceException e) {
+//            // Return a Bad Request status with an appropriate message
+//            return new ResponseEntity<>(null, HttpStatus.BAD_REQUEST);
+//        }
+//    }
+
+//    @GetMapping("transaction/{transactionId}")
+//    public ResponseEntity<Transaction> getTransactionById(@RequestParam int transactionId) {
+//        try {
+//            Transaction transaction = transactionService.getTransactionById(transactionId);
+//            return new ResponseEntity<>(transaction, HttpStatus.OK);
+//        } catch (TransactionNotFoundException e) {
+//            return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+//        }
+//    }
+
+
+//    @GetMapping("transaction/account/{accountNumber}")
+//    public ResponseEntity<List<Transaction>> getAllTransactionsByAccountNumber(@RequestParam String accountNumber) {
+//        List<Transaction> transactions = transactionService.getAllTransactionsByAccountNumber(accountNumber);
+//        return new ResponseEntity<>(transactions, HttpStatus.OK);
+//    }

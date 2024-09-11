@@ -1,0 +1,188 @@
+package com.aurionpro.mappings.service;
+
+import java.util.ArrayList;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+
+import com.aurionpro.mappings.config.RecaptchaService;
+import com.aurionpro.mappings.dto.CustomerDto;
+import com.aurionpro.mappings.dto.LoginDTO;
+import com.aurionpro.mappings.dto.RegistrationDTO;
+import com.aurionpro.mappings.entity.Customer;
+import com.aurionpro.mappings.entity.Role;
+import com.aurionpro.mappings.entity.User;
+import com.aurionpro.mappings.exception.UserApiException;
+import com.aurionpro.mappings.repository.RoleRepository;
+import com.aurionpro.mappings.repository.UserRepository;
+import com.aurionpro.mappings.security.JwtTokenProvider;
+import com.aurionpro.mappings.repository.CustomerRepository;
+
+import lombok.AllArgsConstructor;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+@Service
+@AllArgsConstructor
+public class AuthServiceImpl implements AuthService {
+	
+	private static final Logger logger = LoggerFactory.getLogger(AuthServiceImpl.class);
+
+
+	@Autowired
+    private final AuthenticationManager authenticationManager;
+	@Autowired
+    private final UserRepository userRepo;
+	@Autowired
+    private final RoleRepository roleRepo;
+	@Autowired
+    private final PasswordEncoder passwordEncoder;
+	@Autowired
+    private final JwtTokenProvider tokenProvider;
+	@Autowired
+    private final CustomerRepository customerRepo;
+	@Autowired
+	private final UserDetailsService userDetailsService;
+	
+	@Autowired
+	private final EmailService emailService;
+	
+	@Autowired
+	private RecaptchaService recaptchaService;
+
+	 @Override
+	    public User register(RegistrationDTO registration) {
+	        logger.info("Registering new user with username: {}", registration.getUsername());
+
+	        if (userRepo.existsByUsername(registration.getUsername())) {
+	            logger.error("User with username {} already exists", registration.getUsername());
+	            throw new UserApiException(HttpStatus.BAD_REQUEST, "User already exists");
+	        }
+
+	        User user = new User();
+	        user.setUsername(registration.getUsername());
+	        user.setPassword(passwordEncoder.encode(registration.getPassword()));
+
+	        try {
+	            List<Role> roles = new ArrayList<>();
+	            Role userRole = roleRepo.findByRolename(registration.getRole())
+	                .orElseThrow(() -> {
+	                    logger.error("Role {} not found", registration.getRole());
+	                    return new UserApiException(HttpStatus.NOT_FOUND, "Role not found");
+	                });
+	            roles.add(userRole);
+	            user.setRoles(roles);
+
+	            logger.info("User registered successfully with username: {}", registration.getUsername());
+	            return userRepo.save(user);
+	        } catch (Exception e) {
+	            logger.error("Error occurred while registering user: {}", e.getMessage());
+	            throw new UserApiException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to register user");
+	        }
+	    }
+	    
+	 @Override
+	 public CustomerDto addNewCustomer(CustomerDto customerDTO) {
+	     // Step 1: Create and save the Customer entity
+	     Customer customer = new Customer();
+	     customer.setFirstName(customerDTO.getFirstName());
+	     customer.setLastName(customerDTO.getLastName());
+	     customer.setEmailId(customerDTO.getEmailId());
+	     customer.setPassword(passwordEncoder.encode(customerDTO.getPassword()));
+	     customer.setMobileNumber(customerDTO.getMobileNumber());
+	     customer.setDateOfBirth(customerDTO.getDateOfBirth());
+	     
+	     Customer savedCustomer = customerRepo.save(customer);
+	     
+	     // Step 2: Create and save the User entity
+	     User user = new User();
+	     user.setUsername(customerDTO.getEmailId());
+	     user.setPassword(passwordEncoder.encode(customerDTO.getPassword()));
+	     
+	     // Retrieve the Role entity and assign it to the user
+	     Optional<Role> roleOptional = roleRepo.findByRolename("ROLE_CUSTOMER");
+	     if (roleOptional.isPresent()) {
+	         Role role = roleOptional.get();
+	         user.setRoles(Collections.singletonList(role));
+	     } else {
+	         throw new RuntimeException("Role not found");
+	     }
+	     
+	     // Save the User entity
+	     User savedUser = userRepo.save(user);
+	     
+	     // Step 3: Update the Customer entity with the saved User
+	     savedCustomer.setUser(savedUser);
+	     customerRepo.save(savedCustomer);
+	     
+	     // Step 4: Send email notification
+	     String subject = "Welcome to Our Bank";
+	     String body = "Dear " + savedCustomer.getFirstName() + ",\n\n" +
+	                   "Thank you for registering with us! Your account has been successfully created.\n\n" +
+	                   "If you have any questions or need assistance, please feel free to contact us.\n\n" +
+	                   "Best regards,\n" +
+	                   "Your Bank Name";
+	     emailService.sendEmail(savedCustomer.getEmailId(), subject, body);
+
+	     logger.info("Email sent to customer: {}", savedCustomer.getEmailId());
+
+	     // Step 5: Return the CustomerDto
+	     return new CustomerDto(
+	         savedCustomer.getCustomerId(),
+	         savedCustomer.getFirstName(),
+	         savedCustomer.getLastName(),
+	         savedCustomer.getEmailId(),
+	         savedCustomer.getPassword(),
+	         savedCustomer.getMobileNumber(),
+	         savedCustomer.getDateOfBirth()
+	     );
+	 }
+	 
+	 
+	 @Override
+	 public String login(LoginDTO loginDto) {
+	     // Validate CAPTCHA
+	     boolean captchaValid = recaptchaService.validateRecaptcha(loginDto.getCaptchaResponse());
+	     if (!captchaValid) {
+	         throw new UserApiException(HttpStatus.BAD_REQUEST, "Invalid CAPTCHA");
+	     }
+
+	     try {
+	         Authentication authentication = authenticationManager.authenticate(
+	                 new UsernamePasswordAuthenticationToken(loginDto.getUsername(), loginDto.getPassword()));
+	         SecurityContextHolder.getContext().setAuthentication(authentication);
+	         return tokenProvider.generateToken(authentication);
+	     } catch (BadCredentialsException e) {
+	         throw new UserApiException(HttpStatus.NOT_FOUND, "Username or password is incorrect");
+	     }
+	 }
+	 
+	 
+//
+//	 @Override
+//	    public String login(LoginDTO loginDto) {
+//	        try {
+//	            Authentication authentication = authenticationManager.authenticate(
+//	                    new UsernamePasswordAuthenticationToken(loginDto.getUsername(), loginDto.getPassword()));
+//	            SecurityContextHolder.getContext().setAuthentication(authentication);
+//	            return tokenProvider.generateToken(authentication);
+//	        } catch (BadCredentialsException e) {
+//	            throw new UserApiException(HttpStatus.NOT_FOUND, "Username or password is incorrect");
+//	        }
+//	    }
+}

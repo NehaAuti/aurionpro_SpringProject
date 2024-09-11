@@ -1,0 +1,12 @@
+package com.aurionpro.mappings.exception;
+
+public class AdminNotFoundException extends RuntimeException {
+    public AdminNotFoundException(String message) {
+        super("Invalid transaction type. Allowed types are transfer, debit, and credit");
+//        
+//        @Override 
+//        public String getMessage() { 
+//            return "Invalid transaction type. Allowed types are transfer, debit, and credit."; 
+//        }
+    }
+}

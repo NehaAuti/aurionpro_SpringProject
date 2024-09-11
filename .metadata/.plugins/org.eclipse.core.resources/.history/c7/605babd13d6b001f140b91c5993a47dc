@@ -1,0 +1,32 @@
+package com.aurionpro.mappings.dto;
+
+import java.time.LocalDate;
+
+import jakarta.persistence.Column;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class CustomerDto {
+	private int customerId;
+	@NotBlank(message = "First name is mandatory")
+    @Pattern(regexp = "^[a-zA-Z]+$", message = "First name must contain only letters")
+    @Column(name = "first_name")
+    private String firstName;
+
+    @NotBlank(message = "Last name is mandatory")
+    @Pattern(regexp = "^[a-zA-Z]+$", message = "Last name must contain only letters")
+    @Column(name = "last_name")
+    private String lastName;
+    private String emailId;
+    private String password;  
+    private String mobileNumber;
+    private LocalDate dateOfBirth; 
+}

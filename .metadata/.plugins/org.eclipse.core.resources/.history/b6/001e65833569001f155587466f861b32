@@ -1,0 +1,101 @@
+package com.aurionpro.batchprocessing.config;
+
+
+import com.aurionpro.batchprocessing.entity.Employee;
+
+import jakarta.persistence.EntityManagerFactory;
+
+import org.springframework.batch.core.Job;
+import org.springframework.batch.core.Step;
+import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
+import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
+import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
+import org.springframework.batch.item.ItemProcessor;
+import org.springframework.batch.item.database.JpaPagingItemReader;
+import org.springframework.batch.item.file.FlatFileItemWriter;
+import org.springframework.batch.item.file.builder.FlatFileItemWriterBuilder;
+import org.springframework.batch.item.database.builder.JpaPagingItemReaderBuilder;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.FileSystemResource;
+
+@Configuration
+@EnableBatchProcessing
+public class BatchConfig {
+
+    @Autowired
+    private JobBuilderFactory jobBuilderFactory;
+
+    @Autowired
+    private StepBuilderFactory stepBuilderFactory;
+
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
+
+    /**
+     * ItemReader: Reads data from the database.
+     */
+    @Bean
+    public JpaPagingItemReader<Employee> reader() {
+        return new JpaPagingItemReaderBuilder<Employee>()
+                .name("employeeReader")
+                .entityManagerFactory(entityManagerFactory)
+                .queryString("SELECT e FROM Employee e")
+                .pageSize(10)
+                .build();
+    }
+
+    /**
+     * ItemProcessor: Processes data between reading and writing.
+     * This is optional. If no processing is needed, you can skip it.
+     */
+    @Bean
+    public ItemProcessor<Employee, Employee> processor() {
+        return employee -> {
+            // Example processing: Convert firstName to uppercase
+            employee.setFirstName(employee.getFirstName().toUpperCase());
+            employee.setLastName(employee.getLastName().toUpperCase());
+            return employee;
+        };
+    }
+
+    /**
+     * ItemWriter: Writes data to a CSV file.
+     */
+    @Bean
+    public FlatFileItemWriter<Employee> writer() {
+        return new FlatFileItemWriterBuilder<Employee>()
+                .name("employeeWriter")
+                .resource(new FileSystemResource("output/employees.csv"))
+                .delimited()
+                .delimiter(",")
+                .names(new String[]{"employeeId", "firstName", "lastName", "email", "department", "salary"})
+                .build();
+    }
+
+    /**
+     * Step: Defines a single step in the job.
+     */
+    @Bean
+    public Step step1() {
+        return stepBuilderFactory.get("step1")
+                .<Employee, Employee>chunk(10)
+                .reader(reader())
+                .processor(processor()) // Omit if not using a processor
+                .writer(writer())
+                .build();
+    }
+
+    /**
+     * Job: Defines the batch job.
+     */
+    @Bean
+    public Job exportEmployeeJob(JobCompletionNotificationListener listener, Step step1) {
+        return jobBuilderFactory.get("exportEmployeeJob")
+                .listener(listener)
+                .flow(step1)
+                .end()
+                .build();
+    }
+}

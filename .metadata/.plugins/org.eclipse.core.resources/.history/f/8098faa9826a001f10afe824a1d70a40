@@ -1,0 +1,13 @@
+package com.auriopro.bank.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.auriopro.bank.entity.Customer;
+import com.auriopro.bank.entity.Document;
+
+
+import java.util.List;
+
+public interface DocumentRepository extends JpaRepository<Document, Long> {
+    List<Document> findByCustomer(Customer customer);
+}

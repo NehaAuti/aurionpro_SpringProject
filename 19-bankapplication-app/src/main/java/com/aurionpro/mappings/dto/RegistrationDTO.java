@@ -1,0 +1,29 @@
+package com.aurionpro.mappings.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+
+@AllArgsConstructor
+@RequiredArgsConstructor
+@Data
+public class RegistrationDTO {
+	
+	
+    @NotBlank(message = "Username name is mandatory")
+	private String username;
+    
+    
+    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@#$%^&+=]).*$", 
+            message = "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character")
+
+	private String password;
+    @NotBlank(message = "First name is mandatory")
+    
+    @NotBlank(message = "Role name is mandatory")
+	private String role;
+	
+
+}

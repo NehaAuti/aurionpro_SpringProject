@@ -1,0 +1,5 @@
+package com.aurionpro.mappings.dto;
+
+public class CustomerEditRequestDto {
+
+}

@@ -1,0 +1,6 @@
+employeeId, firstName,lastName, salary,email,department
+1,Neha,Auti,80000.0,neha@gmail.com,Developer
+2,Sakshi,Thorbolr,70000.0,sakshi@gmail.com,Hr
+3,Sayali,Warde,60000.0,sayali@gmail.com,Tester
+4,Namrata,Narkhede,60000.0,namrata@gmail.com,Marketing
+5,Aagya,Singha,50000.0,aagya@gmail.com,Sale

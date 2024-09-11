@@ -1,0 +1,82 @@
+package com.aurionpro.bank.config;
+
+import static org.springframework.security.config.http.SessionCreationPolicy.STATELESS;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.builders.WebSecurity;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import com.aurionpro.bank.security.CustomerUserDetailsService;
+import com.aurionpro.bank.security.JwtAuthenticationEntryPoint;
+import com.aurionpro.bank.security.JwtAuthenticationFilter;
+
+@Configuration
+@EnableMethodSecurity
+public class SecurityConfig {
+
+    @Autowired
+    private CustomerUserDetailsService customerUserDetailsService;
+
+    @Autowired
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Autowired
+    private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+
+    @Bean
+    public static PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+        return configuration.getAuthenticationManager();
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http.csrf(csrf -> csrf.disable())
+            .cors(cors -> cors.disable())
+            .sessionManagement(session -> session.sessionCreationPolicy(STATELESS))
+            .authorizeHttpRequests(authz -> authz
+                .requestMatchers("/bankapp/register/admin").permitAll()
+                .requestMatchers("/bankapp/register/customer").permitAll()
+                .requestMatchers("/bankapp/login").permitAll()
+                .requestMatchers("/bankapp/bankaccount/create").permitAll()
+                .requestMatchers("/bankapp/customerId").permitAll()
+                .requestMatchers("/bankapp/bankaccount").permitAll()
+                .requestMatchers("/bankapp/bankaccount/{bankId}").permitAll()
+                .requestMatchers("/bankapp/accountnumber/{accountNumber}").permitAll()
+                .requestMatchers("/bankapp/customer/{customerId}").permitAll()
+                .requestMatchers("/bankapp/customer").permitAll()
+                .requestMatchers("/bankapp/editCustomer").permitAll()
+                .requestMatchers("/bankapp/customers").permitAll()
+                .requestMatchers("/bankapp/customers/{customerId}").permitAll()
+                .requestMatchers("/bankapp/passbooks/{senderAccountNumber}").permitAll()
+                .requestMatchers("/bankapp/newtransaction/{customerId}").permitAll()
+                .requestMatchers("/bankapp/accountnumber").permitAll()
+                .requestMatchers("/bankapp/transactions").permitAll()
+                .requestMatchers(HttpMethod.GET, "/bankapp/**").authenticated()
+                .requestMatchers(HttpMethod.POST, "/bankapp/**").authenticated()
+                .requestMatchers(HttpMethod.PUT, "/bankapp/**").authenticated()
+                .requestMatchers(HttpMethod.DELETE, "/bankapp/**").authenticated()
+                .anyRequest().authenticated()
+            )
+            .exceptionHandling(exception -> exception.authenticationEntryPoint(authenticationEntryPoint))
+            .addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+}

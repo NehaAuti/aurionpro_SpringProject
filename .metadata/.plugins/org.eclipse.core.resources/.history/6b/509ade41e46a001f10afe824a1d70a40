@@ -1,0 +1,102 @@
+package com.aurionpro.mappings.service;
+
+import java.util.List;
+
+
+import java.io.ByteArrayOutputStream;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.aurionpro.mappings.entity.Passbook;
+import com.aurionpro.mappings.entity.Transaction;
+import com.aurionpro.mappings.repository.PassbookRepository;
+import com.itextpdf.text.pdf.PdfDocument;
+import com.itextpdf.text.pdf.PdfWriter;
+import com.aurionpro.mappings.repository.BankAccountRepository;
+
+@Service
+public class PassbookServiceImpl implements PassbookService {
+
+    private static final Logger logger = LoggerFactory.getLogger(PassbookServiceImpl.class);
+
+    @Autowired
+    private PassbookRepository passbookRepo;
+
+    @Autowired
+    private BankAccountRepository bankAccountRepo;
+    
+    @Autowired
+    private EmailService emailService;
+    
+    public byte[] generatePassbookPdf(List<Transaction> transactions) {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        try (PdfWriter writer = new PdfWriter(outputStream);
+             PdfDocument pdf = new PdfDocument(writer);
+             Document document = new Document(pdf)) {
+
+            document.add(new Paragraph("Passbook").setFontSize(18).setBold());
+
+            // Add transactions to the PDF
+            Table table = new Table(4);
+            table.addHeaderCell("Transaction ID");
+            table.addHeaderCell("Amount");
+            table.addHeaderCell("Transaction Date");
+            table.addHeaderCell("Type");
+
+            for (Transaction transaction : transactions) {
+                table.addCell(String.valueOf(transaction.getTransactionId()));
+                table.addCell(String.valueOf(transaction.getAmount()));
+                table.addCell(transaction.getTransactionDate().toString());
+                table.addCell(transaction.getTransactionType().toString());
+            }
+
+            document.add(table);
+
+        } catch (Exception e) {
+            e.printStackTrace(); // Handle exceptions appropriately
+        }
+
+        return outputStream.toByteArray();
+    }
+    
+    
+    public void sendPassbookEmail(String toEmail, byte[] passbookPdf) {
+        try {
+            MimeMessage message = emailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+
+            helper.setFrom(fromEmail);
+            helper.setTo(toEmail);
+            helper.setSubject("Your Passbook Request");
+            helper.setText("Dear Customer, \n\nPlease find attached your passbook.\n\nBest regards,\nBank");
+
+            // Add attachment
+            helper.addAttachment("Passbook.pdf", new ByteArrayInputStream(passbookPdf));
+
+            emailSender.send(message);
+
+        } catch (MessagingException e) {
+            e.printStackTrace(); // Handle exceptions appropriately
+        }
+    }
+    @Override
+    public List<Passbook> getPassbooksBySenderAccountNumber(String senderAccountNumber) {
+        logger.info("Fetching passbook records for account number: {}", senderAccountNumber);
+
+        // Check if the account exists
+        if (!bankAccountRepo.existsByAccountNumber(senderAccountNumber)) {
+            logger.warn("Account number not found: {}", senderAccountNumber);
+            throw new IllegalArgumentException("Account number not found.");
+        }
+
+        // Fetch passbook records for the sender account number
+        List<Passbook> passbookRecords = passbookRepo.findBySenderAccountNumber(senderAccountNumber);
+        logger.info("Found {} passbook records for account number: {}", passbookRecords.size(), senderAccountNumber);
+
+        return passbookRecords;
+    }
+}

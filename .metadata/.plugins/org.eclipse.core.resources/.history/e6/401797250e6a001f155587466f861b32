@@ -1,0 +1,98 @@
+package com.aurionpro.mappings.config;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.http.HttpMethod;
+import org.springframework.orm.jpa.JpaTransactionManager;
+import org.springframework.orm.jpa.JpaVendorAdapter;
+import org.springframework.orm.jpa.hibernate5.HibernateJpaVendorAdapter;
+import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.transaction.PlatformTransactionManager;
+
+import com.aurionpro.mappings.security.JwtAuthenticationEntryPoint;
+import com.aurionpro.mappings.security.JwtAuthenticationFilter;
+
+import jakarta.persistence.EntityManagerFactory;
+
+import static org.springframework.security.config.Customizer.withDefaults;
+import static org.springframework.security.config.http.SessionCreationPolicy.STATELESS;
+
+import javax.sql.DataSource;
+
+@EnableWebSecurity
+@EnableMethodSecurity
+@Configuration
+@EnableJpaRepositories(basePackages = "com.aurionpro.mappings.repository")
+@EntityScan(basePackages = "com.aurionpro.mappings.entity")
+public class SecurityConfig {
+
+	 @Autowired
+	    private CustomerUserDetailsService customerUserDetailsService;
+
+	    @Autowired
+	    private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+	    @Autowired
+	    private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+
+	    @Bean
+	    public static PasswordEncoder passwordEncoder() {
+	        return new BCryptPasswordEncoder();
+	    }
+
+	    @Bean
+	    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+	        return configuration.getAuthenticationManager();
+	    }
+
+	@Bean
+	  SecurityFilterChain filterChain(HttpSecurity http) throws Exception { 
+	    http.csrf(csrf -> csrf.disable()).cors(withDefaults());
+	    http.sessionManagement(session -> session.sessionCreationPolicy(STATELESS));
+	    
+	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/register/admin").permitAll());
+	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/register/customer").permitAll());
+	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/login").permitAll());
+	    
+//	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/bankaccount/create").permitAll());
+//	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/customerId").permitAll());
+//	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/bankaccount").permitAll());
+//	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/bankaccount/{bankId}").permitAll());
+//	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/accountnumber/{accountNumber}").permitAll());
+//	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/customer/{customerId}").permitAll());
+//	    
+//	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/customer").permitAll());
+//	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/editCustomer").permitAll());
+//	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/customers").permitAll());
+//	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/customers/{customerId}").permitAll());
+//	    
+//	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/passbooks/{senderAccountNumber}").permitAll());
+//	    
+//	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/newtransaction/{customerId}").permitAll());
+//	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/accountnumber").permitAll());
+//	    http.authorizeHttpRequests(request -> request.requestMatchers("/bankapp/transactions").permitAll());
+	    
+
+	    http.authorizeHttpRequests(request -> request.requestMatchers(HttpMethod.GET, "/bankapp/**"));
+	    http.authorizeHttpRequests(request -> request.requestMatchers(HttpMethod.POST, "/bankapp/**"));
+	    http.authorizeHttpRequests(request -> request.requestMatchers(HttpMethod.PUT, "/bankapp/**"));
+	    http.authorizeHttpRequests(request -> request.requestMatchers(HttpMethod.DELETE, "/bankapp/**"));
+	    http.exceptionHandling(exception -> exception.authenticationEntryPoint(authenticationEntryPoint));
+	    http.addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class);
+	    http.authorizeHttpRequests(request -> request.anyRequest().authenticated());
+	    return http.build();
+	  }
+}

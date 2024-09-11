@@ -1,0 +1,378 @@
+package com.aurionpro.mappings.service;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+
+import java.sql.Timestamp;
+import java.time.LocalDate;
+
+import java.time.ZoneId;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.aurionpro.mappings.dto.PageResponse;
+import com.aurionpro.mappings.entity.BankAccount;
+import com.aurionpro.mappings.entity.Customer;
+import com.aurionpro.mappings.entity.Passbook;
+import com.aurionpro.mappings.entity.Transaction;
+import com.aurionpro.mappings.entity.TransactionType;
+import com.aurionpro.mappings.exception.CustomerNotFoundException;
+import com.aurionpro.mappings.repository.BankAccountRepository;
+import com.aurionpro.mappings.repository.CustomerRepository;
+import com.aurionpro.mappings.repository.PassbookRepository;
+import com.aurionpro.mappings.repository.TransactionRepository;
+
+import jakarta.transaction.Transactional;
+import jakarta.validation.ConstraintViolationException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+@Service
+public class TransactionServiceImpl implements TransactionService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(TransactionServiceImpl.class);
+
+    @Autowired
+    private TransactionRepository transactionRepo;
+
+    @Autowired
+    private BankAccountRepository bankAccountRepo;
+
+    @Autowired
+    private CustomerRepository customerRepo;
+
+    @Autowired
+    private PassbookRepository passbookRepo;
+    
+    @Autowired
+    private EmailService emailService;
+    
+    @Transactional
+    @Override
+    public Transaction createTransaction(int customerId, String senderAccountNumber, String receiverAccountNumber, double amount, String transactionType) {
+
+        logger.info("Creating transaction. Customer ID: {}, Sender Account: {}, Receiver Account: {}, Amount: {}, Transaction Type: {}",
+                customerId, senderAccountNumber, receiverAccountNumber, amount, transactionType);
+
+        // Check if customer is valid
+        if (!isCustomerValid(customerId)) {
+            logger.warn("Invalid customer ID: {}", customerId);
+            throw new CustomerNotFoundException("Customer with ID " + customerId + " not found.");
+        }
+
+        // Fetch and validate the sender account
+        BankAccount senderAccount = bankAccountRepo.findByAccountNumber(senderAccountNumber)
+                .orElseThrow(() -> {
+                    logger.error("Sender account number not found: {}", senderAccountNumber);
+                    return new IllegalArgumentException("Sender account number not found.");
+                });
+
+        // Initialize receiver account to null
+        BankAccount receiverAccount = null;
+
+        // Handle different transaction types
+        TransactionType transactionEnum = TransactionType.valueOf(transactionType.toUpperCase());
+
+        switch (transactionEnum) {
+            case TRANSFER:
+                logger.info("Processing transfer transaction.");
+
+                // Fetch and validate the receiver account
+                if (receiverAccountNumber == null || receiverAccountNumber.trim().isEmpty()) {
+                    logger.error("Receiver account number must be provided for a transfer.");
+                    throw new IllegalArgumentException("Receiver account number must be provided for a transfer.");
+                }
+
+                if (senderAccountNumber.equals(receiverAccountNumber)) {
+                    logger.error("Sender and receiver accounts cannot be the same.");
+                    throw new IllegalArgumentException("Sender and receiver accounts cannot be the same.");
+                }
+
+                receiverAccount = bankAccountRepo.findByAccountNumber(receiverAccountNumber)
+                        .orElseThrow(() -> {
+                            logger.error("Receiver account number not found: {}", receiverAccountNumber);
+                            return new IllegalArgumentException("Receiver account number not found.");
+                        });
+
+                // Check if sender has sufficient balance and won't fall below minimum after transfer
+                double initialSenderBalance = senderAccount.getBalance();
+                double newSenderBalance = initialSenderBalance - amount;
+                logger.info("Initial sender balance: {}", initialSenderBalance);
+                logger.info("Amount to be transferred: {}", amount);
+                logger.info("Calculated new sender balance: {}", newSenderBalance);
+
+                if (newSenderBalance < 1) {
+                    logger.error("Transaction would cause sender balance to fall below the minimum required balance of 5000. Current balance: {}, Amount: {}", initialSenderBalance, amount);
+                    throw new IllegalArgumentException("Insufficient balance after transaction. Balance must remain at least 5000.");
+                }
+
+                // Update sender's and receiver's balances
+                senderAccount.setBalance(newSenderBalance);
+                receiverAccount.setBalance(receiverAccount.getBalance() + amount);
+
+                logger.info("Sender account balance after transfer: {}", senderAccount.getBalance());
+                logger.info("Receiver account balance after transfer: {}", receiverAccount.getBalance());
+
+                break;
+
+            case DEBIT:
+                logger.info("Processing debit transaction.");
+
+                // Check if sender has sufficient balance and won't fall below minimum after debit
+                double newDebitBalance = senderAccount.getBalance() - amount;
+                if (newDebitBalance < 5000) {
+                    logger.error("Transaction would cause sender balance to fall below the minimum required balance of 5000. Current balance: {}, Amount: {}", senderAccount.getBalance(), amount);
+                    throw new IllegalArgumentException("Insufficient balance after transaction. Balance must remain at least 5000.");
+                }
+
+                // Debit the amount from the sender account
+                senderAccount.setBalance(newDebitBalance);
+
+                logger.info("Sender account balance after debit: {}", senderAccount.getBalance());
+                break;
+
+            case CREDIT:
+                logger.info("Processing credit transaction.");
+
+                // Credit the amount to the sender account (no balance check needed)
+                senderAccount.setBalance(senderAccount.getBalance() + amount);
+
+                logger.info("Sender account balance after credit: {}", senderAccount.getBalance());
+                break;
+
+            default:
+                logger.error("Invalid transaction type: {}", transactionType);
+                throw new IllegalArgumentException("Invalid transaction type.");
+        }
+
+        // Save the updated bank accounts (if applicable)
+        try {
+            bankAccountRepo.save(senderAccount);
+            if (receiverAccount != null) {
+                bankAccountRepo.save(receiverAccount);
+            }
+        } catch (ConstraintViolationException e) {
+            logger.error("Balance validation failed: {}", e.getMessage());
+            throw new IllegalArgumentException("Transaction failed: " + e.getMessage());
+        }
+
+        // Create and save the transaction record
+        Transaction transaction = new Transaction();
+        transaction.setSenderAccount(senderAccount);
+        transaction.setReceiverAccount(receiverAccount);
+        transaction.setAmount(amount);
+        transaction.setTransactionType(transactionEnum);
+        transaction.setTransactionDate(LocalDate.now());
+
+        Transaction savedTransaction = transactionRepo.save(transaction);
+        logger.info("Transaction created successfully with ID: {}", savedTransaction.getTransactionId());
+
+        // Create and save the passbook record
+        Passbook passbook = new Passbook();
+        passbook.setSenderAccountNumber(senderAccountNumber);
+        passbook.setReceiverAccountNumber(receiverAccountNumber);
+        passbook.setAmount(amount);
+        passbook.setTransactionDate(Timestamp.from(LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()));
+        passbook.setTransactionType(transactionType);
+
+        passbookRepo.save(passbook);
+        logger.info("Passbook entry created successfully for transaction ID: {}", savedTransaction.getTransactionId());
+
+        // Send email notification
+        String subject = "Transaction Confirmation";
+        String body = "Dear Customer,\n\n" +
+                      "Your transaction has been processed successfully.\n\n" +
+                      "Sender Account: " + senderAccountNumber + "\n" +
+                      "Receiver Account: " + receiverAccountNumber + "\n" +
+                      "Amount: " + amount + "\n" +
+                      "Transaction Date: " + LocalDate.now() + "\n\n" +
+                      "Thank you for using our service.";
+
+        // Assuming you have an email service to send emails
+        emailService.sendEmail(senderAccount.getCustomer().getEmailId(), subject, body);
+
+        return savedTransaction;
+    }
+
+
+    // Method to fetch the customer email by ID
+    private String getCustomerEmailById(int customerId) {
+        return customerRepo.findById(customerId)
+                .map(Customer::getEmailId)
+                .orElseThrow(() -> new RuntimeException("Customer not found"));
+    }
+
+
+
+
+    @Override
+    public boolean isValidTransactionType(String transactionType) {
+        try {
+            TransactionType.valueOf(transactionType.toUpperCase());
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+
+    @Override
+    public boolean isCustomerValid(int customerId) {
+        boolean isValid = customerRepo.existsById(customerId);
+        logger.debug("Checking if customer is valid: Customer ID: {}, Valid: {}", customerId, isValid);
+        return isValid;
+    }
+
+    @Override
+    public boolean isAccountValid(String accountNumber) {
+        boolean isValid = bankAccountRepo.existsByAccountNumber(accountNumber);
+        logger.debug("Checking if account is valid: Account Number: {}, Valid: {}", accountNumber, isValid);
+        return isValid;
+    }
+
+    @Override
+    public boolean hasSufficientBalance(BankAccount account, double amount) {
+        boolean hasBalance = account.getBalance() >= amount;
+        logger.debug("Checking if account has sufficient balance: Account Number: {}, Required Amount: {}, Has Sufficient Balance: {}",
+                account.getAccountNumber(), amount, hasBalance);
+        return hasBalance;
+    }
+
+
+    @Override
+    public PageResponse<Transaction> getAllTransactions(int pageNo, int pageSize) {
+        logger.info("Retrieving all transactions with pagination - PageNo: {}, PageSize: {}", pageNo, pageSize);
+        Pageable pageable = PageRequest.of(pageNo, pageSize);
+        Page<Transaction> transactionsPage = transactionRepo.findAll(pageable);
+
+        boolean isLastPage = transactionsPage.isLast();
+
+        PageResponse<Transaction> pageResponse = new PageResponse<>(
+            transactionsPage.getContent(),
+            transactionsPage.getNumber(),
+            transactionsPage.getSize(),
+            transactionsPage.getTotalElements(),
+            transactionsPage.getTotalPages(),
+            isLastPage
+        );
+
+        logger.info("Retrieved {} transactions on page {}", pageResponse.getContent().size(), pageNo);
+        return pageResponse;
+    }
+
+
+    
+    @Override
+    public List<Transaction> getAllTransactionsByAccountNumber(String accountNumber) {
+        logger.info("Fetching transactions for account number: {}", accountNumber);
+        BankAccount bankAccount = bankAccountRepo.findByAccountNumber(accountNumber)
+                .orElseThrow(() -> new RuntimeException("Account not found for account number: " + accountNumber));
+        
+        // Fetching sent and received transactions
+        List<Transaction> transactions = bankAccount.getSentTransactions();
+        transactions.addAll(bankAccount.getReceivedTransactions());
+
+        logger.info("Retrieved {} transactions for account number: {}", transactions.size(), accountNumber);
+        return transactions;
+    }
+
+   
+  
+
+//    public Transaction newTransaction(TransactionType transactionType, String senderAccNo, String receiverAccNo, Double amount) {
+//        logger.info("Starting newTransactio,n with type: {}, senderAccNo: {}, receiverAccNo: {}, amount: {}", transactionType, senderAccNo, receiverAccNo, amount);
+//
+//        BankAccount senderAccount = bankAccountService.getBankAccountByNumber(senderAccNo);
+//        BankAccount receiverAccount = null;
+//
+//        if (transactionType == TransactionType.TRANSFER) {
+//            if (receiverAccNo == null || receiverAccNo.isEmpty()) {
+//                throw new IllegalArgumentException("Receiver account number is required for transfer transactions.");
+//            }
+//            receiverAccount = bankAccountService.getBankAccountByNumber(receiverAccNo);
+//        }
+//
+//        if (transactionType == TransactionType.DEBIT || transactionType == TransactionType.TRANSFER) {
+//            if (senderAccount == null) {
+//                logger.error("Sender account not found with account number: {}", senderAccNo);
+//                throw new BankAccountNotFoundException("Sender account not found.");
+//            }
+//            if (senderAccount.getBalance() < amount) {
+//                logger.error("Insufficient balance in sender's account: {}", senderAccNo);
+//                throw new InsufficientBalanceException("Insufficient balance in the sender's account.");
+//            }
+//            double newSenderBalance = senderAccount.getBalance() - amount;
+//            if (newSenderBalance < 5000) {
+//                logger.error("Balance cannot be less than 5000 for account: {}", senderAccNo);
+//                throw new IllegalArgumentException("Balance cannot be less than 5000.");
+//            }
+//            senderAccount.setBalance(newSenderBalance);
+//            logger.info("Updating sender account {} with new balance: {}", senderAccNo, newSenderBalance);
+//            bankAccountService.updateBankAccount(senderAccount.getAccountNumber(), senderAccount);
+//        }
+//
+//        if (transactionType == TransactionType.CREDIT) {
+//            if (receiverAccNo == null || receiverAccNo.isEmpty()) {
+//                throw new IllegalArgumentException("Receiver account number is required for Credit transactions.");
+//            }
+//            receiverAccount = bankAccountService.getBankAccountByNumber(receiverAccNo);
+//            if (receiverAccount == null) {
+//                logger.error("Receiver account not found with account number: {}", receiverAccNo);
+//                throw new BankAccountNotFoundException("Receiver account not found.");
+//            }
+//        }
+//
+//        if (transactionType == TransactionType.CREDIT || transactionType == TransactionType.TRANSFER) {
+//            if (receiverAccount == null) {
+//                throw new IllegalArgumentException("Receiver account must be specified for Credit and Transfer transactions.");
+//            }
+//
+//            double newReceiverBalance = receiverAccount.getBalance() + amount;
+//            receiverAccount.setBalance(newReceiverBalance);
+//            logger.info("Updating receiver account {} with new balance: {}", receiverAccNo, newReceiverBalance);
+//            bankAccountService.updateBankAccount(receiverAccount.getAccountNumber(), receiverAccount);
+//        }
+//
+//        Transaction transaction = new Transaction();
+//        transaction.setSenderAccountNumber(senderAccNo);
+//        transaction.setReceiverAccountNumber(receiverAccNo);
+//        transaction.setTransactionType(transactionType);
+//        transaction.setAmount(amount);
+//        transaction.setTransactionDate(new Date());
+//
+//        logger.info("Saving transaction: {}", transaction);
+//        return transactionRepository.save(transaction);
+//    }
+
+//    public Transaction getTransactionById(int transactionId) {
+//        Optional<Transaction> transaction = transactionRepository.findById(transactionId);
+//        if (transaction.isPresent()) {
+//            return transaction.get();
+//        } else {
+//            logger.error("Transaction not found with ID: {}", transactionId);
+//            throw new TransactionNotFoundException("Transaction not found with ID " + transactionId);
+//        }
+//    }
+ 
+
+//    @Override
+//    public List<Transaction> getAllTransactionsByAccountNumber(String accountNumber) {
+//        logger.info("Fetching transactions for account number: {}", accountNumber);
+//        String customerId = getCustomerIdByAccountNumber(accountNumber); // Fetch the customerId
+//        List<Transaction> transactions = transactionRepo.findByAccountNumberAndCustomerId(accountNumber, customerId);
+//        logger.info("Retrieved {} transactions for account number: {}", transactions.size(), accountNumber);
+//        return transactions;
+//    }
+//
+//    @Override
+//    public String getCustomerIdByAccountNumber(String accountNumber) {
+//        return bankAccountRepo.findByAccountNumber(accountNumber)
+//                .map(BankAccount::getCustomerId)  // Use method reference to get customerId
+//                .orElseThrow(() -> new RuntimeException("Customer ID not found for account number: " + accountNumber));
+//    }
+
+}

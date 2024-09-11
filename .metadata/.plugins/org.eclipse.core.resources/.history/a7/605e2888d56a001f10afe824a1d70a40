@@ -1,0 +1,51 @@
+package com.aurionpro.mappings.service;
+
+import com.aurionpro.mappings.config.RecaptchaConfig;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
+
+@Service
+public class RecaptchaService {
+
+    @Value("${recaptcha.secret.key}")
+    private String recaptchaSecret;
+
+    public boolean validateRecaptcha(String captchaResponse) {
+        String url = "https://www.google.com/recaptcha/api/siteverify";
+        RestTemplate restTemplate = new RestTemplate();
+        String response = restTemplate.postForObject(url, new MultiValueMap<String, String>() {{
+            add("secret", recaptchaSecret);
+            add("response", captchaResponse);
+        }}, String.class);
+        
+        // Parse the response and check if successful
+        // Example:
+        // JSONObject jsonObject = new JSONObject(response);
+        // return jsonObject.getBoolean("success");
+        
+        return true; // Replace with actual validation result
+    }
+}
+
+
+//    @Autowired
+//    private RecaptchaConfig recaptchaConfig;
+//
+//    public boolean validateRecaptcha(String recaptchaResponse) {
+//        String url = "https://www.google.com/recaptcha/api/siteverify?secret=" + recaptchaConfig.getSecretKey() + "&response=" + recaptchaResponse;
+//
+//        
+//        
+//        RestTemplate restTemplate = new RestTemplate();
+//        String response = restTemplate.postForObject(url, null, String.class);
+//
+//        JsonObject jsonObject = JsonParser.parseString(response).getAsJsonObject();
+//        return jsonObject.get("success").getAsBoolean();
+//        
+//        
+        

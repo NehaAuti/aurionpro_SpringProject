@@ -1,0 +1,86 @@
+package com.aurionpro.mappings.config;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.http.HttpMethod;
+import org.springframework.orm.jpa.JpaTransactionManager;
+import org.springframework.orm.jpa.JpaVendorAdapter;
+import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.transaction.PlatformTransactionManager;
+
+import com.aurionpro.mappings.security.JwtAuthenticationEntryPoint;
+import com.aurionpro.mappings.security.JwtAuthenticationFilter;
+import com.aurionpro.mappings.security.CustomUserDetailService;
+
+
+import jakarta.persistence.EntityManagerFactory;
+
+import static org.springframework.security.config.Customizer.withDefaults;
+import static org.springframework.security.config.http.SessionCreationPolicy.STATELESS;
+
+import javax.sql.DataSource;
+
+@EnableWebSecurity
+@EnableMethodSecurity
+@Configuration
+@EnableJpaRepositories(basePackages = "com.aurionpro.mappings.repository")
+@EntityScan(basePackages = "com.aurionpro.mappings.entity")
+public class SecurityConfig {
+
+	 @Autowired
+	    private CustomUserDetailService customerUserDetailsService;
+
+	    @Autowired
+	    private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+	    @Autowired
+	    private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+
+	    @Bean
+	    public static PasswordEncoder passwordEncoder() {
+	        return new BCryptPasswordEncoder();
+	    }
+
+	    @Bean
+	    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+	        return configuration.getAuthenticationManager();
+	    }
+
+	    @Bean
+	    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+	        http.csrf(csrf -> csrf.disable())
+	            .cors(cors -> cors.disable())
+	            .sessionManagement(session -> session.sessionCreationPolicy(STATELESS))
+	            .authorizeHttpRequests(authz -> authz
+	                .requestMatchers("/api/auth/register").permitAll()
+	                .requestMatchers("/api/auth/login").permitAll()
+	                .requestMatchers("/api/customers/login").permitAll()
+	                .requestMatchers(HttpMethod.POST, "/api/admin/customer").hasRole("ADMIN")
+	                .requestMatchers(HttpMethod.POST, "/api/admin/account").hasRole("ADMIN")
+	                .requestMatchers(HttpMethod.GET, "/api/admin/customers").hasRole("ADMIN")
+	                .requestMatchers(HttpMethod.GET, "/api/admin/transactions").hasRole("ADMIN")
+	                .requestMatchers(HttpMethod.POST, "/api/admin/bank").hasRole("ADMIN")
+	                .requestMatchers(HttpMethod.PUT, "/api/customers/updateProfile").hasRole("CUSTOMER")
+	                .requestMatchers(HttpMethod.POST, "/api/customers/transactions").hasRole("CUSTOMER")
+	                .requestMatchers(HttpMethod.GET, "/api/customers/transactions").hasRole("CUSTOMER")
+	                .anyRequest().authenticated()
+	            )
+	            .exceptionHandling(exception -> exception.authenticationEntryPoint(jwtAuthenticationEntryPoint))
+	            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
+	        return http.build();
+}
+}
